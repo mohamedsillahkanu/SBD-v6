@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <!-- Background with rounded corners -->
+  <rect width="200" height="200" rx="24" fill="#0056a8"/>
+  
+  <!-- Subtle inner glow/border -->
+  <rect x="6" y="6" width="188" height="188" rx="20" fill="none" stroke="white" stroke-width="2" opacity="0.2"/>
+  
+  <!-- Large Bold SBD -->
+  <text x="100" y="105" 
+        font-family="Impact, 'Arial Black', sans-serif" 
+        font-size="88" 
+        font-weight="900" 
+        fill="white" 
+        text-anchor="middle">SBD</text>
+  
+  <!-- Yellow accent bar -->
+  <rect x="24" y="120" width="152" height="8" rx="4" fill="#ffc107"/>
+  
+  <!-- ITN SURVEY subtitle -->
+  <text x="100" y="160" 
+        font-family="Impact, 'Arial Black', sans-serif" 
+        font-size="22" 
+        font-weight="700" 
+        fill="white" 
+        text-anchor="middle"
+        letter-spacing="3"
+        opacity="0.9">ITN SURVEY</text>
+</svg>

@@ -87,20 +87,37 @@ function loadLocationData() {
             complete: function(results) {
                 LOCATION_DATA = {};
                 results.data.forEach(row => {
-                    const d = (row.adm1 || '').trim();
-                    const c = (row.adm2 || '').trim();
-                    const s = (row.adm3 || '').trim();
-                    const f = (row.hf || '').trim();
-                    if (!d) return;
-                    if (!LOCATION_DATA[d]) LOCATION_DATA[d] = {};
-                    if (!LOCATION_DATA[d][c]) LOCATION_DATA[d][c] = {};
-                    if (!LOCATION_DATA[d][c][s]) LOCATION_DATA[d][c][s] = [];
-                    if (f && !LOCATION_DATA[d][c][s].includes(f)) LOCATION_DATA[d][c][s].push(f);
+                    const district = (row.adm1 || '').trim();
+                    const chiefdom = (row.adm2 || '').trim();
+                    const section = (row.adm3 || '').trim();
+                    const facility = (row.hf || '').trim();
+                    const community = (row.community || '').trim();
+                    const school = (row.school_name || '').trim();
+                    
+                    if (!district) return;
+                    
+                    // Build nested structure: district -> chiefdom -> section -> facility -> community -> schools[]
+                    if (!LOCATION_DATA[district]) LOCATION_DATA[district] = {};
+                    if (!LOCATION_DATA[district][chiefdom]) LOCATION_DATA[district][chiefdom] = {};
+                    if (!LOCATION_DATA[district][chiefdom][section]) LOCATION_DATA[district][chiefdom][section] = {};
+                    if (!LOCATION_DATA[district][chiefdom][section][facility]) LOCATION_DATA[district][chiefdom][section][facility] = {};
+                    if (community && !LOCATION_DATA[district][chiefdom][section][facility][community]) {
+                        LOCATION_DATA[district][chiefdom][section][facility][community] = [];
+                    }
+                    if (community && school && !LOCATION_DATA[district][chiefdom][section][facility][community].includes(school)) {
+                        LOCATION_DATA[district][chiefdom][section][facility][community].push(school);
+                    }
                 });
+                
+                // Sort schools within each community
                 for (const d in LOCATION_DATA) {
                     for (const c in LOCATION_DATA[d]) {
                         for (const s in LOCATION_DATA[d][c]) {
-                            LOCATION_DATA[d][c][s].sort();
+                            for (const f in LOCATION_DATA[d][c][s]) {
+                                for (const com in LOCATION_DATA[d][c][s][f]) {
+                                    LOCATION_DATA[d][c][s][f][com].sort();
+                                }
+                            }
                         }
                     }
                 }
@@ -132,14 +149,15 @@ function setupCascading() {
     const community = document.getElementById('community');
     const school = document.getElementById('school_name');
 
-    if (!district || !chiefdom || !section || !facility) return;
+    if (!district) return;
 
+    // District change
     district.addEventListener('change', function() {
         resetSelect(chiefdom, 'Select Chiefdom...');
         resetSelect(section, 'Select Section...');
         resetSelect(facility, 'Select Health Facility...');
-        if (community) resetSelect(community, 'Select Community...');
-        if (school) resetSelect(school, 'Select School...');
+        resetSelect(community, 'Select Community...');
+        resetSelect(school, 'Select School...');
         clearCount('chiefdom'); clearCount('section_loc'); clearCount('facility');
         clearCount('community'); clearCount('school_name');
         
@@ -156,11 +174,12 @@ function setupCascading() {
         }
     });
 
+    // Chiefdom change
     chiefdom.addEventListener('change', function() {
         resetSelect(section, 'Select Section...');
         resetSelect(facility, 'Select Health Facility...');
-        if (community) resetSelect(community, 'Select Community...');
-        if (school) resetSelect(school, 'Select School...');
+        resetSelect(community, 'Select Community...');
+        resetSelect(school, 'Select School...');
         clearCount('section_loc'); clearCount('facility');
         clearCount('community'); clearCount('school_name');
         
@@ -177,66 +196,62 @@ function setupCascading() {
         }
     });
 
+    // Section change
     section.addEventListener('change', function() {
         resetSelect(facility, 'Select Health Facility...');
-        if (community) resetSelect(community, 'Select Community...');
-        if (school) resetSelect(school, 'Select School...');
+        resetSelect(community, 'Select Community...');
+        resetSelect(school, 'Select School...');
         clearCount('facility'); clearCount('community'); clearCount('school_name');
         
         const d = district.value, c = chiefdom.value, s = this.value;
         if (d && c && s && LOCATION_DATA[d] && LOCATION_DATA[d][c] && LOCATION_DATA[d][c][s]) {
             facility.disabled = false;
-            const sectionData = LOCATION_DATA[d][c][s];
-            
-            // Check if data has facility array or object structure
-            if (Array.isArray(sectionData)) {
-                // Original structure: array of facilities
-                sectionData.forEach(f => {
-                    const opt = document.createElement('option');
-                    opt.value = f; opt.textContent = f;
-                    facility.appendChild(opt);
-                });
-                updateCount('facility', sectionData.length);
-            } else if (sectionData.facilities) {
-                // New structure with communities
-                sectionData.facilities.forEach(f => {
-                    const opt = document.createElement('option');
-                    opt.value = f; opt.textContent = f;
-                    facility.appendChild(opt);
-                });
-                updateCount('facility', sectionData.facilities.length);
-            }
+            const facilities = Object.keys(LOCATION_DATA[d][c][s]).sort();
+            facilities.forEach(f => {
+                const opt = document.createElement('option');
+                opt.value = f; opt.textContent = f;
+                facility.appendChild(opt);
+            });
+            updateCount('facility', facilities.length);
         }
     });
 
-    // Facility change enables community (if structured data exists)
-    if (facility && community) {
-        facility.addEventListener('change', function() {
-            if (community) resetSelect(community, 'Select Community...');
-            if (school) resetSelect(school, 'Select School...');
-            clearCount('community'); clearCount('school_name');
-            
-            // For now, community and school are text inputs until CSV is updated
-            // When CSV includes community/school data, this can be populated
-            if (this.value) {
-                community.disabled = false;
-                // Placeholder: Add communities when available in CSV
-            }
-        });
-    }
+    // Facility change
+    facility.addEventListener('change', function() {
+        resetSelect(community, 'Select Community...');
+        resetSelect(school, 'Select School...');
+        clearCount('community'); clearCount('school_name');
+        
+        const d = district.value, c = chiefdom.value, s = section.value, f = this.value;
+        if (d && c && s && f && LOCATION_DATA[d] && LOCATION_DATA[d][c] && LOCATION_DATA[d][c][s] && LOCATION_DATA[d][c][s][f]) {
+            community.disabled = false;
+            const communities = Object.keys(LOCATION_DATA[d][c][s][f]).sort();
+            communities.forEach(com => {
+                const opt = document.createElement('option');
+                opt.value = com; opt.textContent = com;
+                community.appendChild(opt);
+            });
+            updateCount('community', communities.length);
+        }
+    });
 
-    // Community change enables school
-    if (community && school) {
-        community.addEventListener('change', function() {
-            if (school) resetSelect(school, 'Select School...');
-            clearCount('school_name');
-            
-            if (this.value) {
-                school.disabled = false;
-                // Placeholder: Add schools when available in CSV
-            }
-        });
-    }
+    // Community change
+    community.addEventListener('change', function() {
+        resetSelect(school, 'Select School...');
+        clearCount('school_name');
+        
+        const d = district.value, c = chiefdom.value, s = section.value, f = facility.value, com = this.value;
+        if (d && c && s && f && com && LOCATION_DATA[d] && LOCATION_DATA[d][c] && LOCATION_DATA[d][c][s] && LOCATION_DATA[d][c][s][f] && LOCATION_DATA[d][c][s][f][com]) {
+            school.disabled = false;
+            const schools = LOCATION_DATA[d][c][s][f][com];
+            schools.forEach(sch => {
+                const opt = document.createElement('option');
+                opt.value = sch; opt.textContent = sch;
+                school.appendChild(opt);
+            });
+            updateCount('school_name', schools.length);
+        }
+    });
 }
 
 function resetSelect(el, placeholder) {
@@ -765,6 +780,7 @@ function loadDraft(id) {
 
     state.currentDraftId = id;
     
+    // Load cascading fields in sequence with delays
     if (draft.district) {
         document.getElementById('district').value = draft.district;
         document.getElementById('district').dispatchEvent(new Event('change'));
@@ -781,21 +797,36 @@ function loadDraft(id) {
                 document.getElementById('section_loc').dispatchEvent(new Event('change'));
             }
             setTimeout(() => {
-                if (draft.facility) document.getElementById('facility').value = draft.facility;
-                
-                Object.keys(draft).forEach(k => {
-                    if (['draftId', 'draftName', 'savedAt', 'currentSection', 'district', 'chiefdom', 'section_loc', 'facility'].includes(k)) return;
-                    const el = document.getElementById(k);
-                    if (el) el.value = draft[k];
-                });
-
-                if (draft.currentSection) {
-                    document.querySelectorAll('.form-section').forEach(s => s.classList.remove('active'));
-                    state.currentSection = draft.currentSection;
-                    document.querySelector(`.form-section[data-section="${draft.currentSection}"]`).classList.add('active');
+                if (draft.facility) {
+                    document.getElementById('facility').value = draft.facility;
+                    document.getElementById('facility').dispatchEvent(new Event('change'));
                 }
-                updateProgress();
-                calculateAll();
+                setTimeout(() => {
+                    if (draft.community) {
+                        document.getElementById('community').value = draft.community;
+                        document.getElementById('community').dispatchEvent(new Event('change'));
+                    }
+                    setTimeout(() => {
+                        if (draft.school_name) {
+                            document.getElementById('school_name').value = draft.school_name;
+                        }
+                        
+                        // Load all other fields
+                        Object.keys(draft).forEach(k => {
+                            if (['draftId', 'draftName', 'savedAt', 'currentSection', 'district', 'chiefdom', 'section_loc', 'facility', 'community', 'school_name'].includes(k)) return;
+                            const el = document.getElementById(k);
+                            if (el) el.value = draft[k];
+                        });
+
+                        if (draft.currentSection) {
+                            document.querySelectorAll('.form-section').forEach(s => s.classList.remove('active'));
+                            state.currentSection = draft.currentSection;
+                            document.querySelector(`.form-section[data-section="${draft.currentSection}"]`).classList.add('active');
+                        }
+                        updateProgress();
+                        calculateAll();
+                    }, 100);
+                }, 100);
             }, 100);
         }, 100);
     }, 100);
@@ -907,17 +938,22 @@ function resetForm() {
     document.getElementById('submitBtn').disabled = true;
     document.getElementById('finalizeBtn').disabled = false;
     
-    // Reset cascading dropdowns
+    // Reset all 6 cascading dropdowns
     const chiefdom = document.getElementById('chiefdom');
     const section = document.getElementById('section_loc');
     const facility = document.getElementById('facility');
     const community = document.getElementById('community');
     const school = document.getElementById('school_name');
+    
     if (chiefdom) { chiefdom.innerHTML = '<option value="">Select Chiefdom...</option>'; chiefdom.disabled = true; }
     if (section) { section.innerHTML = '<option value="">Select Section...</option>'; section.disabled = true; }
     if (facility) { facility.innerHTML = '<option value="">Select Health Facility...</option>'; facility.disabled = true; }
     if (community) { community.innerHTML = '<option value="">Select Community...</option>'; community.disabled = true; }
     if (school) { school.innerHTML = '<option value="">Select School...</option>'; school.disabled = true; }
+    
+    // Clear counts
+    clearCount('chiefdom'); clearCount('section_loc'); clearCount('facility');
+    clearCount('community'); clearCount('school_name');
     
     updateProgress();
     setDefaultDate();

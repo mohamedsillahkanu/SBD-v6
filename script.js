@@ -45,6 +45,7 @@ async function init() {
     setupCascading();
     setupValidation();
     setupPhoneValidation();
+    setupNameValidation();
     setupCalculations();
     initAllSignaturePads();
     captureGPS();
@@ -445,6 +446,120 @@ function validateAllPhoneFields() {
     let valid = true;
     document.querySelectorAll('.phone-field[required]').forEach(input => {
         if (!validatePhoneField(input)) valid = false;
+    });
+    return valid;
+}
+
+// ============================================
+// NAME VALIDATION (Text only, no numbers)
+// ============================================
+function setupNameValidation() {
+    document.querySelectorAll('.name-field').forEach(input => {
+        input.addEventListener('input', function() {
+            // Remove any numbers
+            this.value = this.value.replace(/[0-9]/g, '');
+        });
+        
+        input.addEventListener('blur', function() {
+            validateNameField(this);
+        });
+    });
+}
+
+function validateNameField(input) {
+    const errorEl = document.getElementById('error_' + input.id);
+    const isRequired = input.hasAttribute('required');
+    const value = input.value.trim();
+    
+    if (value === '' && !isRequired) {
+        input.classList.remove('error');
+        if (errorEl) errorEl.classList.remove('show');
+        return true;
+    }
+    
+    // Check if contains only letters, spaces, hyphens, apostrophes
+    if (!/^[A-Za-z\s\-'\.]+$/.test(value)) {
+        input.classList.add('error');
+        if (errorEl) errorEl.classList.add('show');
+        return false;
+    }
+    
+    input.classList.remove('error');
+    if (errorEl) errorEl.classList.remove('show');
+    return true;
+}
+
+function validateAllNameFields() {
+    let valid = true;
+    document.querySelectorAll('.name-field[required]').forEach(input => {
+        if (!validateNameField(input)) valid = false;
+    });
+    return valid;
+}
+
+// ============================================
+// NAME VALIDATION (Text only, no numbers)
+// ============================================
+function setupNameValidation() {
+    document.querySelectorAll('.name-field').forEach(input => {
+        input.addEventListener('input', function() {
+            // Remove numbers and special characters, allow letters, spaces, hyphens, apostrophes
+            this.value = this.value.replace(/[0-9]/g, '');
+        });
+        
+        input.addEventListener('blur', function() {
+            validateNameField(this);
+        });
+    });
+}
+
+function validateNameField(input) {
+    const errorEl = document.getElementById('error_' + input.id);
+    const isRequired = input.hasAttribute('required');
+    const value = input.value.trim();
+    
+    // Check if empty and required
+    if (value === '' && !isRequired) {
+        input.classList.remove('error');
+        if (errorEl) errorEl.classList.remove('show');
+        return true;
+    }
+    
+    if (value === '' && isRequired) {
+        input.classList.add('error');
+        if (errorEl) errorEl.classList.add('show');
+        return false;
+    }
+    
+    // Check for numbers (should not have any)
+    if (/[0-9]/.test(value)) {
+        input.classList.add('error');
+        if (errorEl) {
+            errorEl.textContent = 'Name cannot contain numbers';
+            errorEl.classList.add('show');
+        }
+        return false;
+    }
+    
+    // Check minimum length (at least 2 characters)
+    if (value.length < 2) {
+        input.classList.add('error');
+        if (errorEl) {
+            errorEl.textContent = 'Name must be at least 2 characters';
+            errorEl.classList.add('show');
+        }
+        return false;
+    }
+    
+    input.classList.remove('error');
+    if (errorEl) errorEl.classList.remove('show');
+    return true;
+}
+
+function validateAllNameFields() {
+    let valid = true;
+    document.querySelectorAll('.name-field[required]').forEach(input => {
+        if (!validateNameField(input)) valid = false;
     });
     return valid;
 }
@@ -1101,6 +1216,12 @@ function finalizeForm() {
     // Validate all phone fields
     if (!validateAllPhoneFields()) {
         showNotification('Please enter valid 9-digit phone numbers.', 'error');
+        return;
+    }
+
+    // Validate all name fields (no numbers allowed)
+    if (!validateAllNameFields()) {
+        showNotification('Names must contain only letters (no numbers).', 'error');
         return;
     }
 
